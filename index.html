@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LuCred - Controle Financeiro</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Tela de Acesso Inicial -->
+    <div id="accessScreen" class="access-screen">
+        <div class="access-container">
+            <div class="access-logo">
+                <i class="fas fa-coins"></i>
+                <h1>LuCred</h1>
+                <p class="access-subtitle">Controle Financeiro Inteligente</p>
+            </div>
+            <div class="access-form">
+                <h2><i class="fas fa-lock"></i> Acesso ao Sistema</h2>
+                <div class="form-group">
+                    <label for="accessPassword">Senha de Acesso:</label>
+                    <input type="password" id="accessPassword" placeholder="Digite a senha" autocomplete="off">
+                </div>
+                <button class="btn btn-primary btn-block" id="accessButton">
+                    <i class="fas fa-unlock-alt"></i> Acessar Sistema
+                </button>
+            </div>
+            <div class="access-footer">
+                <p>&copy; 2026 LuCred - Todos os direitos reservados</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sistema Principal (inicialmente oculto) -->
+    <div id="mainSystem" class="main-system" style="display: none;">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-coins"></i>
+                <h1>LuCred <span class="pro-badge">PRO</span></h1>
+            </div>
+            <div class="user-info">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                    <span>Administrador</span>
+                </div>
+                <button class="btn btn-outline" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Sair
+                </button>
+            </div>
+        </header>
+
+        <!-- Dashboard Principal -->
+        <main class="main-content">
+            <!-- Resumo Financeiro -->
+            <section class="summary-grid">
+                <div class="summary-card card-green">
+                    <div class="card-icon">
+                        <i class="fas fa-hand-holding-usd"></i>
+                    </div>
+                    <div class="card-content">
+                        <h3>Total Emprestado</h3>
+                        <p class="card-value" id="totalLoaned">R$ 0,00</p>
+                        <p class="card-subtitle">+0% este mês</p>
+                    </div>
+                </div>
+                <div class="summary-card card-blue">
+                    <div class="card-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="card-content">
+                        <h3>Juros Recebidos</h3>
+                        <p class="card-value" id="totalInterest">R$ 0,00</p>
+                        <p class="card-subtitle">+0% este mês</p>
+                    </div>
+                </div>
+                <div class="summary-card card-orange">
+                    <div class="card-icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div class="card-content">
+                        <h3>A Receber Hoje</h3>
+                        <p class="card-value" id="dueToday">R$ 0,00</p>
+                        <p class="card-subtitle">0 parcelas</p>
+                    </div>
+                </div>
+                <div class="summary-card card-red">
+                    <div class="card-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="card-content">
+                        <h3>Em Atraso</h3>
+                        <p class="card-value" id="overdueAmount">R$ 0,00</p>
+                        <p class="card-subtitle">0 clientes</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Gráfico de Receita -->
+            <section class="chart-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-chart-bar"></i> Receita Mensal</h2>
+                    <div class="period-selector">
+                        <button class="period-btn active" data-period="week">Semana</button>
+                        <button class="period-btn" data-period="month">Mês</button>
+                        <button class="period-btn" data-period="year">Ano</button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Abas de Navegação -->
+            <nav class="tabs-nav">
+                <button class="tab-btn active" data-tab="dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </button>
+                <button class="tab-btn" data-tab="customers">
+                    <i class="fas fa-users"></i> Clientes
+                </button>
+                <button class="tab-btn" data-tab="loans">
+                    <i class="fas fa-file-invoice-dollar"></i> Empréstimos
+                </button>
+                <button class="tab-btn" data-tab="payments">
+                    <i class="fas fa-money-check-alt"></i> Pagamentos
+                </button>
+                <button class="tab-btn" data-tab="reports">
+                    <i class="fas fa-file-alt"></i> Relatórios
+                </button>
+            </nav>
+
+            <!-- Conteúdo das Abas -->
+            <div class="tabs-content">
+                <!-- Dashboard Tab -->
+                <div id="dashboard-tab" class="tab-pane active">
+                    <div class="dashboard-grid">
+                        <!-- Próximos Vencimentos -->
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-clock"></i> Próximos Vencimentos (7 dias)</h3>
+                                <button class="btn btn-sm btn-primary" onclick="showLoanModal()">
+                                    <i class="fas fa-plus"></i> Novo Empréstimo
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Cliente</th>
+                                            <th>Parcela</th>
+                                            <th>Vencimento</th>
+                                            <th>Valor</th>
+                                            <th>Status</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="upcomingPaymentsTable">
+                                        <!-- Dados serão carregados dinamicamente -->
+                                    </tbody>
+                                </table>
+                                <div id="noUpcomingPayments" class="no-data-message">
+                                    <i class="fas fa-calendar-check"></i>
+                                    <p>Nenhum vencimento nos próximos 7 dias</p>
+                                    <button class="btn btn-secondary" onclick="showLoanModal()">
+                                        <i class="fas fa-plus"></i> Criar Novo Empréstimo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Clientes em Destaque -->
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-star"></i> Clientes Cadastrados</h3>
+                            </div>
+                            <div class="client-ranking" id="clientRanking">
+                                <!-- Dados serão carregados dinamicamente -->
+                            </div>
+                            <div id="noClients" class="no-data-message">
+                                <i class="fas fa-users"></i>
+                                <p>Nenhum cliente cadastrado</p>
+                                <button class="btn btn-secondary" onclick="showCustomerModal()">
+                                    <i class="fas fa-plus"></i> Cadastrar Cliente
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Clientes Tab -->
+                <div id="customers-tab" class="tab-pane">
+                    <div class="card-header">
+                        <h3><i class="fas fa-users"></i> Gerenciamento de Clientes</h3>
+                        <div class="header-actions">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="customerSearch" placeholder="Buscar cliente..." onkeyup="filterCustomers()">
+                            </div>
+                            <button class="btn btn-primary" onclick="showCustomerModal()">
+                                <i class="fas fa-plus"></i> Novo Cliente
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Telefone</th>
+                                    <th>Email</th>
+                                    <th>CPF</th>
+                                    <th>Empréstimos</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customersTable">
+                                <!-- Dados serão carregados dinamicamente -->
+                            </tbody>
+                        </table>
+                        <div id="noCustomers" class="no-data-message">
+                            <i class="fas fa-users"></i>
+                            <p>Nenhum cliente cadastrado</p>
+                            <button class="btn btn-secondary" onclick="showCustomerModal()">
+                                <i class="fas fa-plus"></i> Cadastrar Cliente
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empréstimos Tab -->
+                <div id="loans-tab" class="tab-pane">
+                    <div class="card-header">
+                        <h3><i class="fas fa-file-invoice-dollar"></i> Controle de Empréstimos</h3>
+                        <div class="header-actions">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="loanSearch" placeholder="Buscar empréstimo..." onkeyup="filterLoans()">
+                            </div>
+                            <button class="btn btn-primary" onclick="showLoanModal()">
+                                <i class="fas fa-plus"></i> Novo Empréstimo
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Cliente</th>
+                                    <th>Tipo</th>
+                                    <th>Valor Principal</th>
+                                    <th>Taxa Juros</th>
+                                    <th>Parcelas</th>
+                                    <th>Total a Receber</th>
+                                    <th>Juros</th>
+                                    <th>Lucro</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="loansTable">
+                                <!-- Dados serão carregados dinamicamente -->
+                            </tbody>
+                        </table>
+                        <div id="noLoans" class="no-data-message">
+                            <i class="fas fa-file-invoice-dollar"></i>
+                            <p>Nenhum empréstimo cadastrado</p>
+                            <button class="btn btn-secondary" onclick="showLoanModal()">
+                                <i class="fas fa-plus"></i> Criar Empréstimo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pagamentos Tab -->
+                <div id="payments-tab" class="tab-pane">
+                    <div class="card-header">
+                        <h3><i class="fas fa-money-check-alt"></i> Controle de Pagamentos</h3>
+                        <div class="header-actions">
+                            <select id="paymentStatusFilter" class="form-select" onchange="filterPayments()">
+                                <option value="all">Todos os Status</option>
+                                <option value="pending">Pendentes</option>
+                                <option value="paid">Pagos</option>
+                                <option value="overdue">Atrasados</option>
+                            </select>
+                            <input type="date" id="paymentDateFilter" class="form-input" onchange="filterPayments()">
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Cliente</th>
+                                    <th>Parcela</th>
+                                    <th>Vencimento</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                    <th>Data Pagamento</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="paymentsTable">
+                                <!-- Dados serão carregados dinamicamente -->
+                            </tbody>
+                        </table>
+                        <div id="noPayments" class="no-data-message">
+                            <i class="fas fa-money-check-alt"></i>
+                            <p>Nenhum pagamento registrado</p>
+                            <button class="btn btn-secondary" onclick="showLoanModal()">
+                                <i class="fas fa-plus"></i> Criar Empréstimo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Relatórios Tab -->
+                <div id="reports-tab" class="tab-pane">
+                    <div class="card-header">
+                        <h3><i class="fas fa-file-alt"></i> Relatórios Financeiros</h3>
+                        <div class="header-actions">
+                            <select id="reportPeriod" class="form-select">
+                                <option value="day">Hoje</option>
+                                <option value="week" selected>Esta Semana</option>
+                                <option value="month">Este Mês</option>
+                                <option value="year">Este Ano</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="generateReportPDF()">
+                                <i class="fas fa-file-download"></i> Gerar Relatório PDF
+                            </button>
+                        </div>
+                    </div>
+                    <div class="report-cards">
+                        <div class="report-card">
+                            <h4><i class="fas fa-chart-pie"></i> Resumo Financeiro</h4>
+                            <div class="report-metrics">
+                                <div class="metric-item">
+                                    <span class="metric-label">Total de Empréstimos</span>
+                                    <span class="metric-value" id="totalLoansCount">0</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Valor Total Emprestado</span>
+                                    <span class="metric-value" id="totalLoanedReport">R$ 0,00</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Total de Juros</span>
+                                    <span class="metric-value" id="totalInterestReport">R$ 0,00</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Margem de Lucro</span>
+                                    <span class="metric-value" id="profitMargin">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="report-card">
+                            <h4><i class="fas fa-exclamation-triangle"></i> Inadimplência</h4>
+                            <div class="report-metrics">
+                                <div class="metric-item">
+                                    <span class="metric-label">Parcelas Atrasadas</span>
+                                    <span class="metric-value metric-red" id="overdueCount">0</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Valor em Atraso</span>
+                                    <span class="metric-value metric-red" id="overdueValue">R$ 0,00</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Taxa de Inadimplência</span>
+                                    <span class="metric-value metric-red" id="defaultRate">0%</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Clientes com Atraso</span>
+                                    <span class="metric-value metric-red" id="clientsWithOverdue">0</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="report-card">
+                            <h4><i class="fas fa-calendar-alt"></i> Projeção de Receitas</h4>
+                            <div class="report-metrics">
+                                <div class="metric-item">
+                                    <span class="metric-label">Receita Esperada (Mês)</span>
+                                    <span class="metric-value metric-green" id="expectedMonthly">R$ 0,00</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Receita Esperada (Ano)</span>
+                                    <span class="metric-value metric-green" id="expectedYearly">R$ 0,00</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Crescimento Mensal</span>
+                                    <span class="metric-value metric-green" id="monthlyGrowth">0%</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">ROI (Retorno sobre Investimento)</span>
+                                    <span class="metric-value metric-green" id="roi">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal de Novo Cliente -->
+    <div id="customerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-user-plus"></i> <span id="customerModalTitle">Novo Cliente</span></h2>
+                <span class="close" onclick="closeModal('customerModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="customerForm">
+                    <input type="hidden" id="customerId">
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="customerName"><i class="fas fa-user"></i> Nome Completo:</label>
+                            <input type="text" id="customerName" placeholder="João Silva" required>
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="customerPhone"><i class="fas fa-phone"></i> Telefone:</label>
+                            <input type="tel" id="customerPhone" placeholder="(11) 98765-4321" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="customerEmail"><i class="fas fa-envelope"></i> Email:</label>
+                            <input type="email" id="customerEmail" placeholder="joao@email.com">
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="customerCPF"><i class="fas fa-id-card"></i> CPF:</label>
+                            <input type="text" id="customerCPF" placeholder="123.456.789-00" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="customerAddress"><i class="fas fa-map-marker-alt"></i> Endereço:</label>
+                        <textarea id="customerAddress" placeholder="Rua Exemplo, 123 - Bairro - Cidade/UF" rows="2"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('customerModal')">Cancelar</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> <span id="customerSaveBtnText">Salvar Cliente</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Novo Empréstimo -->
+    <div id="loanModal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2><i class="fas fa-file-invoice-dollar"></i> <span id="loanModalTitle">Novo Empréstimo / Venda</span></h2>
+                <span class="close" onclick="closeModal('loanModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="loanForm">
+                    <input type="hidden" id="loanId">
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="loanCustomer"><i class="fas fa-user"></i> Cliente:</label>
+                            <select id="loanCustomer" required>
+                                <option value="">Selecione um cliente</option>
+                                <!-- Options serão carregados dinamicamente -->
+                            </select>
+                            <small class="form-text"><a href="#" onclick="showCustomerModal(); return false;">+ Cadastrar novo cliente</a></small>
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="loanType"><i class="fas fa-tags"></i> Tipo:</label>
+                            <select id="loanType" required onchange="toggleVehicleFields()">
+                                <option value="loan">Empréstimo</option>
+                                <option value="vehicle">Veículo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Campos do Veículo (opcional) -->
+                    <div id="vehicleFields" style="display: none;">
+                        <div class="form-row">
+                            <div class="form-group col-6">
+                                <label for="vehicleModel"><i class="fas fa-car"></i> Modelo do Veículo:</label>
+                                <input type="text" id="vehicleModel" placeholder="Ex: Gol, Uno, etc.">
+                            </div>
+                            <div class="form-group col-6">
+                                <label for="vehicleYear"><i class="fas fa-calendar"></i> Ano:</label>
+                                <input type="number" id="vehicleYear" placeholder="2020">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group col-6">
+                                <label for="vehiclePlate"><i class="fas fa-hashtag"></i> Placa:</label>
+                                <input type="text" id="vehiclePlate" placeholder="ABC-1234">
+                            </div>
+                            <div class="form-group col-6">
+                                <label for="vehicleChassis"><i class="fas fa-barcode"></i> Chassi:</label>
+                                <input type="text" id="vehicleChassis" placeholder="Chassi do veículo">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="loanPrincipal"><i class="fas fa-dollar-sign"></i> Valor Principal (R$):</label>
+                            <input type="number" id="loanPrincipal" step="0.01" placeholder="5000.00" required oninput="updateCalculationPreview()">
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="loanInterestRate"><i class="fas fa-percentage"></i> Taxa de Juros Mensal (%):</label>
+                            <input type="number" id="loanInterestRate" step="0.01" placeholder="2.5" required oninput="updateCalculationPreview()">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="loanInterestType"><i class="fas fa-calculator"></i> Tipo de Juros:</label>
+                            <select id="loanInterestType" required onchange="updateCalculationPreview()">
+                                <option value="simple">Simples</option>
+                                <option value="compound" selected>Composto (Sistema Price)</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="loanInstallments"><i class="fas fa-list-ol"></i> Número de Parcelas:</label>
+                            <input type="number" id="loanInstallments" min="1" placeholder="12" required oninput="updateCalculationPreview()">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="loanStartDate"><i class="fas fa-calendar"></i> Data de Início:</label>
+                        <input type="date" id="loanStartDate" required>
+                    </div>
+                    <!-- Cálculos Automáticos -->
+                    <div class="calculation-preview">
+                        <h4><i class="fas fa-calculator"></i> Preview dos Cálculos:</h4>
+                        <div class="calc-grid">
+                            <div class="calc-item">
+                                <span class="calc-label">Valor da Parcela:</span>
+                                <span class="calc-value" id="calcMonthlyPayment">R$ 0,00</span>
+                            </div>
+                            <div class="calc-item">
+                                <span class="calc-label">Total a Receber:</span>
+                                <span class="calc-value" id="calcTotalAmount">R$ 0,00</span>
+                            </div>
+                            <div class="calc-item">
+                                <span class="calc-label">Total de Juros:</span>
+                                <span class="calc-value" id="calcTotalInterest">R$ 0,00</span>
+                            </div>
+                            <div class="calc-item">
+                                <span class="calc-label">Lucro Estimado:</span>
+                                <span class="calc-value calc-profit" id="calcProfit">R$ 0,00</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('loanModal')">Cancelar</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> <span id="loanSaveBtnText">Salvar Empréstimo</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Pagamento -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-money-bill-wave"></i> <span id="paymentModalTitle">Registrar Pagamento</span></h2>
+                <span class="close" onclick="closeModal('paymentModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="paymentForm">
+                    <input type="hidden" id="paymentId">
+                    <input type="hidden" id="paymentLoanId">
+                    <input type="hidden" id="paymentInstallmentNumber">
+                    <div class="payment-info" id="paymentInfo">
+                        <!-- Informações serão carregadas dinamicamente -->
+                    </div>
+                    <div class="form-group">
+                        <label for="paymentAmount"><i class="fas fa-dollar-sign"></i> Valor Pago (R$):</label>
+                        <input type="number" id="paymentAmount" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="paymentDate"><i class="fas fa-calendar-check"></i> Data do Pagamento:</label>
+                        <input type="date" id="paymentDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="paymentLateFee"><i class="fas fa-exclamation-triangle"></i> Multa/Juros Atraso (R$):</label>
+                        <input type="number" id="paymentLateFee" step="0.01" value="0.00">
+                        <small class="form-text">Deixe em 0 se não houver atraso</small>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-info-circle"></i> Resumo do Pagamento:</label>
+                        <div class="payment-summary">
+                            <div class="summary-row">
+                                <span>Valor Original:</span>
+                                <span id="summaryOriginalAmount">R$ 0,00</span>
+                            </div>
+                            <div class="summary-row">
+                                <span>Multa/Juros:</span>
+                                <span id="summaryLateFee">R$ 0,00</span>
+                            </div>
+                            <div class="summary-row total">
+                                <span><strong>Total a Receber:</strong></span>
+                                <span id="summaryTotal"><strong>R$ 0,00</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('paymentModal')">Cancelar</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-check"></i> Confirmar Pagamento
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2><i class="fas fa-exclamation-triangle"></i> Confirmar Ação</h2>
+                <span class="close" onclick="closeModal('confirmModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage">Tem certeza que deseja realizar esta ação?</p>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('confirmModal')">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="confirmActionButton">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Status Rápido -->
+    <div id="statusModal" class="modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2><i class="fas fa-sync-alt"></i> Alterar Status</h2>
+                <span class="close" onclick="closeModal('statusModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="statusMessage">Selecione o novo status:</p>
+                <div class="status-options">
+                    <button class="btn btn-block btn-warning" onclick="quickSetStatus('pending')">
+                        <i class="fas fa-clock"></i> Pendente
+                    </button>
+                    <button class="btn btn-block btn-success" onclick="quickSetStatus('paid')">
+                        <i class="fas fa-check-circle"></i> Pago
+                    </button>
+                    <button class="btn btn-block btn-danger" onclick="quickSetStatus('overdue')">
+                        <i class="fas fa-exclamation-triangle"></i> Atrasado
+                    </button>
+                </div>
+                <div class="form-actions" style="margin-top: 15px;">
+                    <button type="button" class="btn btn-secondary btn-block" onclick="closeModal('statusModal')">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jsPDF para gerar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Configuração Firebase -->
+    <script src="firebase-config.js"></script>
+    <!-- Lógica Principal -->
+    <script src="app.js"></script>
+
+    <!-- SCRIPT DE LOGIN E NOTIFICAÇÕES -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Configurar botão de acesso
+        const accessButton = document.getElementById('accessButton');
+        const passwordInput = document.getElementById('accessPassword');
+        
+        if (accessButton && passwordInput) {
+            // Função de login
+            function handleLogin() {
+                const password = passwordInput.value.trim();
+                if (password === '2026') {
+                    // ✅ IDs CORRETOS (case-sensitive)
+                    document.getElementById('accessScreen').style.display = 'none';
+                    document.getElementById('mainSystem').style.display = 'block';
+                    
+                    // Notificação
+                    const toast = document.createElement('div');
+                    toast.className = 'toast toast-success';
+                    toast.innerHTML = '<i class="fas fa-check-circle"></i> ✅ Acesso concedido! Bem-vindo ao LuCred.';
+                    document.body.appendChild(toast);
+                    
+                    setTimeout(() => {
+                        toast.style.opacity = '1';
+                        toast.style.transform = 'translateY(0)';
+                    }, 100);
+                    
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        toast.style.transform = 'translateY(-20px)';
+                        setTimeout(() => toast.remove(), 300);
+                    }, 3000);
+                    
+                    // Carregar dados de exemplo SOMENTE se a função existir
+                    if (typeof window.loadSampleData === 'function') {
+                        setTimeout(() => {
+                            window.loadSampleData();
+                        }, 500);
+                    }
+                } else {
+                    // Notificação de erro
+                    const toast = document.createElement('div');
+                    toast.className = 'toast toast-error';
+                    toast.innerHTML = '<i class="fas fa-exclamation-circle"></i> ❌ Senha incorreta! Tente novamente.';
+                    document.body.appendChild(toast);
+                    
+                    setTimeout(() => {
+                        toast.style.opacity = '1';
+                        toast.style.transform = 'translateY(0)';
+                    }, 100);
+                    
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        toast.style.transform = 'translateY(-20px)';
+                        setTimeout(() => toast.remove(), 300);
+                    }, 3000);
+                    
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                }
+            }
+            
+            // Clique no botão
+            accessButton.addEventListener('click', handleLogin);
+            
+            // Tecla ENTER
+            passwordInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    handleLogin();
+                }
+            });
+        }
+        
+        // Função de logout
+        window.logout = function() {
+            if (confirm('Deseja sair do sistema?')) {
+                document.getElementById('mainSystem').style.display = 'none';
+                document.getElementById('accessScreen').style.display = 'flex';
+                document.getElementById('accessPassword').value = '';
+                
+                // Notificação
+                const toast = document.createElement('div');
+                toast.className = 'toast toast-info';
+                toast.innerHTML = '<i class="fas fa-info-circle"></i> 👋 Você saiu do sistema.';
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.style.opacity = '1';
+                    toast.style.transform = 'translateY(0)';
+                }, 100);
+                
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateY(-20px)';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            }
+        };
+        
+        // Garantir que as funções de filtro não quebrem o sistema
+        window.filterCustomers = window.filterCustomers || function() { console.log('Filtrando clientes...'); };
+        window.filterLoans = window.filterLoans || function() { console.log('Filtrando empréstimos...'); };
+        window.filterPayments = window.filterPayments || function() { console.log('Filtrando pagamentos...'); };
+    });
+    </script>
+
+    <!-- ESTILOS PARA NOTIFICAÇÕES -->
+    <style>
+    .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: white;
+        padding: 15px 25px;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        z-index: 9999;
+        opacity: 0;
+        transform: translateY(-20px);
+        transition: all 0.3s ease;
+    }
+    .toast-success {
+        border-left: 5px solid #10B981;
+        color: #065F46;
+    }
+    .toast-success i {
+        color: #10B981;
+    }
+    .toast-error {
+        border-left: 5px solid #EF4444;
+        color: #991B1B;
+    }
+    .toast-error i {
+        color: #EF4444;
+    }
+    .toast-info {
+        border-left: 5px solid #3B82F6;
+        color: #1E40AF;
+    }
+    .toast-info i {
+        color: #3B82F6;
+    }
+    </style>
+</body>
+</html>
