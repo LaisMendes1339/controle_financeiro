@@ -1,48 +1,47 @@
 // ============================================
-// CONFIGURAÇÃO DO FIREBASE - VERSÃO 9.6.1 (MODULAR)
+// CONFIGURAÇÃO DO FIREBASE - VERSÃO MODULAR (v9+)
 // ============================================
 
-// Importações (não necessárias quando carregado via CDN)
+// Configuração do Firebase
 const firebaseConfig = {
-    apiKey: "AIzaSyD1WbnimImu-nncSzaW_CTbArUmhO_TRtQ",
-    authDomain: "solicitacoes-cartograficas.firebaseapp.com",
-    projectId: "solicitacoes-cartograficas",
-    storageBucket: "solicitacoes-cartograficas.firebasestorage.app",
-    messagingSenderId: "943123891027",
-    appId: "1:943123891027:web:0ff0fdfefcbbfd3fe057a6",
-    measurementId: "G-QF1K8QDXC5"
+    apiKey: "AIzaSyC7BoZJoypnqLlEA4KyB6v2JE9CTc65AqM",
+    authDomain: "controlefinanceiro-dd360.firebaseapp.com",
+    projectId: "controlefinanceiro-dd360",
+    storageBucket: "controlefinanceiro-dd360.firebasestorage.app",
+    messagingSenderId: "363446721742",
+    appId: "1:363446721742:web:b7b1be3edccdce07c1049f"
 };
 
-// Variável global para o app Firebase
-let firebaseApp = null;
+// Inicializar Firebase
+let app = null;
 let db = null;
 
-// Inicializar Firebase
 try {
     // Verificar se Firebase já foi carregado
-    if (typeof firebase !== 'undefined' && firebase.apps.length === 0) {
-        firebaseApp = firebase.initializeApp(firebaseConfig);
+    if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+        app = firebase.initializeApp(firebaseConfig);
         console.log('✅ Firebase inicializado com sucesso!');
         
         // Inicializar Firestore
         db = firebase.firestore();
         console.log('✅ Firestore inicializado com sucesso!');
         
-        // Configurar timestamps para serem convertidos em objetos Date
+        // Configurar timestamps
         db.settings({
             timestampsInSnapshots: true
         });
+        
+        // Exportar db para uso global
+        window.db = db;
     } else if (firebase.apps.length > 0) {
         // Firebase já inicializado
-        firebaseApp = firebase.apps[0];
+        app = firebase.apps[0];
         db = firebase.firestore();
+        window.db = db;
         console.log('✅ Firebase já estava inicializado!');
     }
 } catch (error) {
     console.error('❌ Erro ao inicializar Firebase:', error);
 }
-
-// Exportar db para uso global
-window.db = db;
 
 console.log('✅ Configuração Firebase carregada!');
