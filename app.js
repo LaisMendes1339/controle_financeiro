@@ -1,6 +1,7 @@
 // ============================================
 // VARIÁVEIS GLOBAIS
 // ============================================
+let db = null;
 let customers = [];
 let loans = [];
 let payments = [];
@@ -8,26 +9,54 @@ let currentPayment = null;
 let confirmCallback = null;
 let statusCallback = null;
 let statusData = null;
+let unsubscribeCustomers = null;
+let unsubscribeLoans = null;
+let unsubscribePayments = null;
 
 // Inicializar jsPDF
 const { jsPDF } = window.jspdf;
 
 // ============================================
-// INICIALIZAÇÃO
+// INICIALIZAÇÃO DO SISTEMA
 // ============================================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     console.log('✅ Sistema LuCred iniciando...');
     
-    // Inicializar sistema
-    initSystem();
-    
-    console.log('✅ LuCred carregado com sucesso!');
+    try {
+        // Aguardar Firebase carregar
+        await waitForFirebase();
+        
+        // Inicializar sistema
+        await initSystem();
+        
+        console.log('✅ LuCred carregado com sucesso!');
+    } catch (error) {
+        console.error('❌ Erro na inicialização:', error);
+        showNotification('❌ Erro ao inicializar o sistema!', 'error');
+    }
 });
+
+async function waitForFirebase() {
+    return new Promise((resolve, reject) => {
+        const checkFirebase = setInterval(() => {
+            if (typeof firebase !== 'undefined' && window.db) {
+                db = window.db;
+                clearInterval(checkFirebase);
+                resolve();
+            }
+        }, 100);
+        
+        setTimeout(() => {
+            clearInterval(checkFirebase);
+            reject(new Error('Firebase não carregado'));
+        }, 5000);
+    });
+}
 
 // ============================================
 // INICIALIZAÇÃO DO SISTEMA
 // ============================================
-function initSystem() {
+async function initSystem() {
     // Inicializar gráfico
     initRevenueChart();
     
@@ -41,8 +70,69 @@ function initSystem() {
     if (startDate) startDate.value = today;
     if (paymentDate) paymentDate.value = today;
     
-    // Atualizar dashboard inicial
-    updateDashboard();
+    // Configurar listeners em tempo real do Firebase
+    await setupFirebaseListeners();
+}
+
+// ============================================
+// CONFIGURAÇÃO DOS LISTENERS DO FIREBASE
+// ============================================
+async function setupFirebaseListeners() {
+    if (!db) {
+        console.error('❌ Firestore não inicializado!');
+        return;
+    }
+    
+    try {
+        // Listener para clientes - sincronização em tempo real
+        unsubscribeCustomers = db.collection('customers')
+            .onSnapshot(snapshot => {
+                customers = [];
+                snapshot.forEach(doc => {
+                    customers.push({ id: doc.id, ...doc.data() });
+                });
+                renderCustomersTable();
+                loadCustomersInSelect();
+                updateDashboard();
+                console.log('✅ Clientes sincronizados:', customers.length);
+            }, error => {
+                console.error('❌ Erro ao carregar clientes:', error);
+                showNotification('❌ Erro ao carregar clientes!', 'error');
+            });
+        
+        // Listener para empréstimos - sincronização em tempo real
+        unsubscribeLoans = db.collection('loans')
+            .onSnapshot(snapshot => {
+                loans = [];
+                snapshot.forEach(doc => {
+                    loans.push({ id: doc.id, ...doc.data() });
+                });
+                renderLoansTable();
+                updateDashboard();
+                console.log('✅ Empréstimos sincronizados:', loans.length);
+            }, error => {
+                console.error('❌ Erro ao carregar empréstimos:', error);
+                showNotification('❌ Erro ao carregar empréstimos!', 'error');
+            });
+        
+        // Listener para pagamentos - sincronização em tempo real
+        unsubscribePayments = db.collection('payments')
+            .onSnapshot(snapshot => {
+                payments = [];
+                snapshot.forEach(doc => {
+                    payments.push({ id: doc.id, ...doc.data() });
+                });
+                renderPaymentsTable();
+                updateDashboard();
+                updateReports();
+                console.log('✅ Pagamentos sincronizados:', payments.length);
+            }, error => {
+                console.error('❌ Erro ao carregar pagamentos:', error);
+                showNotification('❌ Erro ao carregar pagamentos!', 'error');
+            });
+    } catch (error) {
+        console.error('❌ Erro ao configurar listeners:', error);
+    }
 }
 
 // ============================================
@@ -181,7 +271,7 @@ function initRevenueChart() {
         labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
         datasets: [{
             label: 'Receita Mensal (R$)',
-            data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             borderColor: '#4F46E5',
             backgroundColor: 'rgba(79, 70, 229, 0.1)',
             borderWidth: 3,
@@ -232,7 +322,7 @@ function initRevenueChart() {
     
     revenueChart = new Chart(chartCtx, {
         type: 'line',
-        data: data,
+         data,
         options: options
     });
 }
@@ -358,7 +448,7 @@ function closeModal(modalId) {
 }
 
 // ============================================
-// CLIENTES - CRUD
+// CLIENTES - CRUD COM FIREBASE
 // ============================================
 function showCustomerModal(customer = null) {
     if (customer) {
@@ -380,7 +470,7 @@ function showCustomerModal(customer = null) {
     showModal('customerModal');
 }
 
-function saveCustomer() {
+async function saveCustomer() {
     const customerId = document.getElementById('customerId').value;
     const name = document.getElementById('customerName').value.trim();
     const phone = document.getElementById('customerPhone').value.trim();
@@ -394,55 +484,65 @@ function saveCustomer() {
     }
     
     const customerData = {
-        id: customerId || generateId(),
         name: name,
         phone: phone,
         email: email,
         cpf: cpf,
         address: address,
-        createdAt: new Date().toISOString(),
-        status: 'active'
+        status: 'active',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
-    if (customerId) {
-        const index = customers.findIndex(c => c.id === customerId);
-        if (index !== -1) {
-            customers[index] = customerData;
+    try {
+        showNotification('⏳ Salvando cliente...', 'info');
+        
+        if (customerId) {
+            // Atualizar cliente existente
+            await db.collection('customers').doc(customerId).update(customerData);
             showNotification('✅ Cliente atualizado com sucesso!', 'success');
+        } else {
+            // Criar novo cliente
+            const docRef = await db.collection('customers').add(customerData);
+            showNotification('✅ Cliente cadastrado com sucesso!', 'success');
         }
-    } else {
-        customers.push(customerData);
-        showNotification('✅ Cliente cadastrado com sucesso!', 'success');
+        
+        closeModal('customerModal');
+    } catch (error) {
+        console.error('❌ Erro ao salvar cliente:', error);
+        showNotification('❌ Erro ao salvar cliente!', 'error');
     }
-    
-    closeModal('customerModal');
-    renderCustomersTable();
-    loadCustomersInSelect();
-    updateDashboard();
 }
 
-function deleteCustomer(id) {
+async function deleteCustomer(id) {
     confirmAction(
         'Excluir Cliente',
         'Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.',
-        function() {
-            // Verificar se o cliente tem empréstimos
-            const customerLoans = loans.filter(l => l.customerId === id);
-            if (customerLoans.length > 0) {
-                showNotification('⚠️ Cliente possui empréstimos ativos. Exclua os empréstimos primeiro.', 'error');
-                return;
+        async function() {
+            try {
+                // Verificar se o cliente tem empréstimos
+                const loansSnapshot = await db.collection('loans')
+                    .where('customerId', '==', id)
+                    .get();
+                
+                if (!loansSnapshot.empty) {
+                    showNotification('⚠️ Cliente possui empréstimos ativos. Exclua os empréstimos primeiro.', 'error');
+                    return;
+                }
+                
+                // Excluir cliente
+                await db.collection('customers').doc(id).delete();
+                showNotification('✅ Cliente excluído com sucesso!', 'success');
+            } catch (error) {
+                console.error('❌ Erro ao excluir cliente:', error);
+                showNotification('❌ Erro ao excluir cliente!', 'error');
             }
-            
-            customers = customers.filter(c => c.id !== id);
-            showNotification('✅ Cliente excluído com sucesso!', 'success');
-            renderCustomersTable();
-            updateDashboard();
         }
     );
 }
 
 // ============================================
-// EMPRÉSTIMOS - CRUD
+// EMPRÉSTIMOS - CRUD COM FIREBASE
 // ============================================
 function loadCustomersInSelect() {
     const select = document.getElementById('loanCustomer');
@@ -507,7 +607,7 @@ function showLoanModal(loan = null) {
     showModal('loanModal');
 }
 
-function saveLoan() {
+async function saveLoan() {
     const loanId = document.getElementById('loanId').value;
     const customerId = document.getElementById('loanCustomer').value;
     const type = document.getElementById('loanType').value;
@@ -530,7 +630,6 @@ function saveLoan() {
     const calculation = calculateCompoundInterest(principal, interestRate, installments);
     
     const loanData = {
-        id: loanId || generateId(),
         customerId: customerId,
         customerName: customer.name,
         type: type,
@@ -543,7 +642,8 @@ function saveLoan() {
         monthlyPayment: calculation.monthlyPayment,
         profit: calculation.profit,
         status: 'active',
-        createdAt: new Date().toISOString()
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
     if (type === 'vehicle') {
@@ -553,50 +653,77 @@ function saveLoan() {
         loanData.vehicleChassis = document.getElementById('vehicleChassis').value;
     }
     
-    if (loanId) {
-        const index = loans.findIndex(l => l.id === loanId);
-        if (index !== -1) {
-            loans[index] = loanData;
-            payments = payments.filter(p => p.loanId !== loanId);
-            createInstallments(loanData);
+    try {
+        showNotification('⏳ Salvando empréstimo...', 'info');
+        
+        if (loanId) {
+            // Atualizar empréstimo existente
+            await db.collection('loans').doc(loanId).update(loanData);
+            
+            // Excluir pagamentos antigos e criar novos
+            const paymentsSnapshot = await db.collection('payments')
+                .where('loanId', '==', loanId)
+                .get();
+            
+            const batch = db.batch();
+            paymentsSnapshot.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+            
+            await createInstallments(loanData, loanId);
             showNotification('✅ Empréstimo atualizado com sucesso!', 'success');
+        } else {
+            // Criar novo empréstimo
+            const docRef = await db.collection('loans').add(loanData);
+            await createInstallments(loanData, docRef.id);
+            showNotification('✅ Empréstimo cadastrado com sucesso!', 'success');
         }
-    } else {
-        loans.push(loanData);
-        createInstallments(loanData);
-        showNotification('✅ Empréstimo cadastrado com sucesso!', 'success');
+        
+        closeModal('loanModal');
+    } catch (error) {
+        console.error('❌ Erro ao salvar empréstimo:', error);
+        showNotification('❌ Erro ao salvar empréstimo!', 'error');
     }
-    
-    closeModal('loanModal');
-    renderLoansTable();
-    updateDashboard();
 }
 
-function deleteLoan(id) {
+async function deleteLoan(id) {
     confirmAction(
         'Excluir Empréstimo',
         'Tem certeza que deseja excluir este empréstimo? Todas as parcelas associadas serão removidas.',
-        function() {
-            loans = loans.filter(l => l.id !== id);
-            payments = payments.filter(p => p.loanId !== id);
-            showNotification('✅ Empréstimo excluído com sucesso!', 'success');
-            renderLoansTable();
-            renderPaymentsTable();
-            updateDashboard();
+        async function() {
+            try {
+                // Excluir pagamentos associados
+                const paymentsSnapshot = await db.collection('payments')
+                    .where('loanId', '==', id)
+                    .get();
+                
+                const batch = db.batch();
+                paymentsSnapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                
+                // Excluir empréstimo
+                await db.collection('loans').doc(id).delete();
+                showNotification('✅ Empréstimo excluído com sucesso!', 'success');
+            } catch (error) {
+                console.error('❌ Erro ao excluir empréstimo:', error);
+                showNotification('❌ Erro ao excluir empréstimo!', 'error');
+            }
         }
     );
 }
 
-function createInstallments(loanData) {
+async function createInstallments(loanData, loanId) {
     const startDate = new Date(loanData.startDate);
     
     for (let i = 1; i <= loanData.installments; i++) {
         const dueDate = new Date(startDate);
         dueDate.setMonth(dueDate.getMonth() + i);
         
-        payments.push({
-            id: generateId(),
-            loanId: loanData.id,
+        const paymentData = {
+            loanId: loanId,
             customerId: loanData.customerId,
             customerName: loanData.customerName,
             installmentNumber: i,
@@ -606,13 +733,15 @@ function createInstallments(loanData) {
             paidAmount: 0,
             status: 'pending',
             paymentDate: null,
-            createdAt: new Date().toISOString()
-        });
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        await db.collection('payments').add(paymentData);
     }
 }
 
 // ============================================
-// PAGAMENTOS - CRUD
+// PAGAMENTOS - CRUD COM FIREBASE
 // ============================================
 function showPaymentModal(payment = null) {
     if (!payment) {
@@ -657,7 +786,7 @@ function updatePaymentSummary() {
     document.getElementById('summaryTotal').textContent = formatCurrency(total);
 }
 
-function savePayment() {
+async function savePayment() {
     const paymentId = document.getElementById('paymentId').value;
     const paymentAmount = parseFloat(document.getElementById('paymentAmount').value);
     const lateFee = parseFloat(document.getElementById('paymentLateFee').value) || 0;
@@ -668,55 +797,65 @@ function savePayment() {
         return;
     }
     
-    const index = payments.findIndex(p => p.id === paymentId);
-    if (index !== -1) {
-        payments[index].status = 'paid';
-        payments[index].paidAmount = paymentAmount;
-        payments[index].lateFee = lateFee;
-        payments[index].paymentDate = paymentDate;
-        
+    const paymentData = {
+        status: 'paid',
+        paidAmount: paymentAmount,
+        lateFee: lateFee,
+        paymentDate: paymentDate,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    try {
+        await db.collection('payments').doc(paymentId).update(paymentData);
         showNotification('✅ Pagamento registrado com sucesso!', 'success');
         closeModal('paymentModal');
-        renderPaymentsTable();
-        updateDashboard();
-        updateReports();
+    } catch (error) {
+        console.error('❌ Erro ao registrar pagamento:', error);
+        showNotification('❌ Erro ao registrar pagamento!', 'error');
     }
 }
 
-function markPaymentAsPaid(paymentId) {
+async function markPaymentAsPaid(paymentId) {
     confirmAction(
         'Confirmar Pagamento',
         'Deseja marcar este pagamento como pago?',
-        function() {
-            const index = payments.findIndex(p => p.id === paymentId);
-            if (index !== -1) {
-                const today = new Date().toISOString().split('T')[0];
-                payments[index].status = 'paid';
-                payments[index].paidAmount = payments[index].amount;
-                payments[index].paymentDate = today;
-                
+        async function() {
+            const today = new Date().toISOString().split('T')[0];
+            
+            const paymentData = {
+                status: 'paid',
+                paidAmount: payments.find(p => p.id === paymentId).amount,
+                paymentDate: today,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            try {
+                await db.collection('payments').doc(paymentId).update(paymentData);
                 showNotification('✅ Pagamento confirmado!', 'success');
-                renderPaymentsTable();
-                updateDashboard();
-                updateReports();
+            } catch (error) {
+                console.error('❌ Erro ao confirmar pagamento:', error);
+                showNotification('❌ Erro ao confirmar pagamento!', 'error');
             }
         }
     );
 }
 
-function editPayment(payment) {
+async function editPayment(payment) {
     showPaymentModal(payment);
 }
 
-function deletePayment(id) {
+async function deletePayment(id) {
     confirmAction(
         'Excluir Pagamento',
         'Tem certeza que deseja excluir este pagamento?',
-        function() {
-            payments = payments.filter(p => p.id !== id);
-            showNotification('✅ Pagamento excluído com sucesso!', 'success');
-            renderPaymentsTable();
-            updateDashboard();
+        async function() {
+            try {
+                await db.collection('payments').doc(id).delete();
+                showNotification('✅ Pagamento excluído com sucesso!', 'success');
+            } catch (error) {
+                console.error('❌ Erro ao excluir pagamento:', error);
+                showNotification('❌ Erro ao excluir pagamento!', 'error');
+            }
         }
     );
 }
@@ -1036,9 +1175,6 @@ function updateDashboard() {
     }
     
     // Renderizar tabelas
-    renderCustomersTable();
-    renderLoansTable();
-    renderPaymentsTable();
     renderClientRanking();
     renderUpcomingPayments();
 }
@@ -1395,95 +1531,4 @@ function generateId() {
 
 function escapeHtml(jsonString) {
     return jsonString.replace(/'/g, "\\'").replace(/"/g, '\\"');
-}
-
-// ============================================
-// DADOS DE EXEMPLO
-// ============================================
-function loadSampleData() {
-    customers = [
-        {
-            id: 'cust1',
-            name: 'João Silva',
-            phone: '(11) 98765-4321',
-            email: 'joao@email.com',
-            cpf: '123.456.789-00',
-            address: 'Rua A, 123 - Centro - São Paulo/SP',
-            createdAt: '2026-01-15T10:00:00',
-            status: 'active'
-        },
-        {
-            id: 'cust2',
-            name: 'Maria Santos',
-            phone: '(11) 97654-3210',
-            email: 'maria@email.com',
-            cpf: '987.654.321-00',
-            address: 'Av. B, 456 - Jardim - São Paulo/SP',
-            createdAt: '2026-01-20T14:30:00',
-            status: 'active'
-        },
-        {
-            id: 'cust3',
-            name: 'Pedro Oliveira',
-            phone: '(11) 96543-2109',
-            email: 'pedro@email.com',
-            cpf: '456.789.123-00',
-            address: 'Rua C, 789 - Vila - São Paulo/SP',
-            createdAt: '2026-01-25T09:15:00',
-            status: 'active'
-        }
-    ];
-    
-    loans = [
-        {
-            id: 'loan1',
-            customerId: 'cust1',
-            customerName: 'João Silva',
-            type: 'loan',
-            principal: 5000,
-            interestRate: 2.5,
-            installments: 12,
-            startDate: '2026-01-15',
-            totalAmount: 6750,
-            totalInterest: 1750,
-            monthlyPayment: 562.50,
-            profit: 1750,
-            status: 'active',
-            createdAt: '2026-01-15T10:00:00'
-        },
-        {
-            id: 'loan2',
-            customerId: 'cust2',
-            customerName: 'Maria Santos',
-            type: 'loan',
-            principal: 10000,
-            interestRate: 3.0,
-            installments: 24,
-            startDate: '2026-01-20',
-            totalAmount: 16000,
-            totalInterest: 6000,
-            monthlyPayment: 666.67,
-            profit: 6000,
-            status: 'active',
-            createdAt: '2026-01-20T14:30:00'
-        }
-    ];
-    
-    payments = [];
-    loans.forEach(loan => createInstallments(loan));
-    
-    // Marcar alguns pagamentos como pagos para demonstração
-    if (payments.length > 0) {
-        payments[0].status = 'paid';
-        payments[0].paidAmount = payments[0].amount;
-        payments[0].paymentDate = '2026-01-15';
-        
-        payments[12].status = 'paid';
-        payments[12].paidAmount = payments[12].amount;
-        payments[12].paymentDate = '2026-01-20';
-    }
-    
-    console.log('✅ Dados de exemplo carregados!');
-    updateDashboard();
-    updateReports();
 }
